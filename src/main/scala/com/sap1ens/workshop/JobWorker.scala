@@ -42,13 +42,13 @@ class JobWorker extends Actor with ActorLogging {
       }
     }
 
-    case _ => log.warning(s"Unrecognized command")
+    case _ => log.warning("Unrecognized command")
   }
 
   def downloadContent(url: String) = {
     // synthetic error here, but it can be real!
     // comment the line to disable failures 
-    if(shouldIFail) throw new Exception(s"Couldn't download url")
+    if(shouldIFail) throw new Exception("Couldn't download url")
 
     Source.fromURL(url).mkString
   }
