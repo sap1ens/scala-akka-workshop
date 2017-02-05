@@ -62,7 +62,7 @@ class JobWorker extends Actor with ActorLogging {
   def downloadContent(id: UUID, url: String): Future[String] = Future {
     // synthetic error here, but it can be real!
     // comment the line to disable failures 
-    if(shouldIFail) throw new Exception(s"Couldn't download url")
+    if(shouldIFail) throw new Exception("Couldn't download url")
 
     Source.fromURL(url).mkString
   }
