@@ -5,14 +5,20 @@ import java.util.UUID
 
 import akka.actor.{Actor, ActorLogging, Props}
 
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 import scala.io.Source
-import scala.util.Random
+import scala.util.{Failure, Random, Success}
 
 object JobWorker {
+  import JobExecutor._
+
   sealed trait JobResult
   case class JobSucceeded(id: UUID)
   case class JobFailed(id: UUID, reason: Throwable)
 
+  case class FailWith(ex: Throwable, job: Job)
+  
   def props() = Props(classOf[JobWorker])
 }
 
@@ -21,31 +27,39 @@ class JobWorker extends Actor with ActorLogging {
   import JobExecutor._
 
   override def preRestart(cause: Throwable, msg: Option[Any]) = {
-    msg foreach { self ! _ } // resend failed message to itself
+    msg foreach {
+      case FailWith(_, job) => self ! job // resend failed message to itself
+      case _ =>  
+    } 
   }
 
   def receive = {
-    case Job(id, Download, url, path, requester) => {
+    case job @ Job(id, Download, url, path, requester) => {
       log.info(s"Executing $id job")
 
-      try {
-        val content = downloadContent(url)
-        createFile(content, path)
+      val result = for {
+        content <- downloadContent(id, url)
+        _ <- createFile(content, path)
+      } yield id
 
-        requester ! JobSucceeded(id)
-      } catch {
-        case ex: Exception => {
+      result onComplete {
+        case Success(_) => {
+          requester ! JobSucceeded(id)
+        }
+        case Failure(ex) => {
           requester ! JobFailed(id, ex)
 
-          throw ex
+          self ! FailWith(ex, job)
         }
       }
     }
 
-    case _ => log.warning(s"Unrecognized command")
+    case fw: FailWith => throw fw.ex  
+
+    case _ => log.warning("Unrecognized command")
   }
 
-  def downloadContent(url: String) = {
+  def downloadContent(id: UUID, url: String): Future[String] = Future {
     // synthetic error here, but it can be real!
     // comment the line to disable failures 
     if(shouldIFail) throw new Exception(s"Couldn't download url")
@@ -53,7 +67,7 @@ class JobWorker extends Actor with ActorLogging {
     Source.fromURL(url).mkString
   }
 
-  def createFile(content: String, path: String) = {
+  def createFile(content: String, path: String) = Future {
     Files.write(Paths.get(path), content.getBytes)
   }
 
