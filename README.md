@@ -12,5 +12,6 @@ A few important things:
 
 - All Akka dependencies are already included in build.sbt
 - You can run the application with `sbt run`
+- Check `SimpleActor` and `Helpers` files
 - Use case classes to represent jobs
-- If you add `ActorLogging` trait to your actor you'll be able to print logging messages with `log.info(...)`, `log.error(...)`, etc.  
+- You will probably need to use routing
